@@ -1,6 +1,6 @@
 # Kisan Scan
 
-Kisan Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using Claude through OpenRouter.
+KisanDrishti Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using Claude through OpenRouter.
 
 ## Overview
 
@@ -39,8 +39,10 @@ kisan-scan/
 |   |-- main.py
 |   `-- requirements.txt
 |-- frontend/
+|   |-- index.html
+|   |-- package.json
+|   |-- vite.config.js
 |   `-- src/
-|-- public/
 |-- saved_models/
 |   |-- disease_model.pth
 |   |-- quality_model.pth
@@ -48,9 +50,6 @@ kisan-scan/
 |   `-- quality_classes.json
 |-- .venv/
 |-- .env.example
-|-- index.html
-|-- package.json
-|-- vite.config.js
 `-- README.md
 ```
 
@@ -75,6 +74,7 @@ cd kisan-scan
 ### 2. Frontend setup
 
 ```bash
+cd frontend
 npm install
 ```
 
@@ -126,6 +126,7 @@ http://localhost:8000
 Open a new terminal:
 
 ```bash
+cd frontend
 npm run dev
 ```
 

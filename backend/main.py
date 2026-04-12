@@ -1,15 +1,16 @@
 import io, os, time, uuid, logging, json
+import re
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
+import requests
  
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import torch, torch.nn as nn
 from torchvision import models, transforms
 from torchvision.models import efficientnet_b4
-import anthropic
 from dotenv import load_dotenv
  
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,9 +20,11 @@ load_dotenv(BASE_DIR / ".env")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
  
-# ── Anthropic client ──────────────────────────────────
-anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-claude = anthropic.Anthropic(api_key=anthropic_api_key) if anthropic_api_key else None
+# ── OpenRouter config for Claude ──────────────────────
+openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+openrouter_model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-opus-4.6")
+openrouter_site_url = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
+openrouter_app_name = os.getenv("OPENROUTER_APP_NAME", "KisanDrishti Scan")
  
 # ── Image transforms ──────────────────────────────────
 disease_tf = transforms.Compose([
@@ -122,11 +125,22 @@ def run_quality(image: Image.Image):
         "all_grades": [{**GRADE_META.get(i, GRADE_META[3]), "confidence": float(p)}
                        for i, p in enumerate(probs)]
     }
+
+
+def parse_json_response(text: str) -> dict:
+    clean = text.strip().replace("```json", "").replace("```", "").strip()
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", clean)
+        if match:
+            return json.loads(match.group(0))
+        raise
  
 # ── Claude AI enrichment ─────────────────────────────
 def enrich_with_claude(disease_result: dict, quality_result: dict | None) -> dict:
-    if claude is None:
-        raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+    if not openrouter_api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is not configured")
 
     disease_name = disease_result["disease_class"]
     crop = disease_result["crop_type"]
@@ -156,14 +170,32 @@ Respond ONLY with JSON (no markdown):
   "farmer_note": "Simple friendly note for Indian farmer in 1 sentence"
 }}"""
  
-    msg = claude.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=800,
-        messages=[{"role": "user", "content": prompt}]
+    headers = {
+        "Authorization": f"Bearer {openrouter_api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": openrouter_site_url,
+        "X-Title": openrouter_app_name,
+    }
+    payload = {
+        "model": openrouter_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": 800,
+        "response_format": {"type": "json_object"},
+    }
+
+    resp = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=45,
     )
-    text = msg.content[0].text.strip()
-    text = text.replace("```json","").replace("```","").strip()
-    return json.loads(text)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"OpenRouter error {resp.status_code}: {resp.text}")
+
+    data = resp.json()
+    text = data["choices"][0]["message"]["content"].strip()
+    return parse_json_response(text)
  
 # ── Routes ───────────────────────────────────────────
 @app.get("/")
@@ -172,7 +204,9 @@ async def root():
         "name": "KisanDrishti Scan",
         "disease_model": disease_model is not None,
         "quality_model": quality_model is not None,
-        "claude": bool(os.getenv("ANTHROPIC_API_KEY"))
+        "claude": bool(openrouter_api_key),
+        "claude_provider": "openrouter",
+        "claude_model": openrouter_model,
     }
  
 @app.get("/health")
@@ -182,8 +216,8 @@ async def health():
 @app.post("/analyze")
 async def analyze(
     file: UploadFile = File(...),
-    crop_hint: Optional[str] = None,
-    use_claude: bool = True
+    crop_hint: Optional[str] = Form(None),
+    use_claude: bool = Form(True)
 ):
     if disease_model is None:
         raise HTTPException(503, "Disease model not loaded")

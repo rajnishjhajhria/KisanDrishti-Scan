@@ -1,6 +1,6 @@
 # Kisan Scan
 
-Kisan Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using Claude AI.
+Kisan Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using Claude through OpenRouter.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This project combines:
 - computer vision with deep learning
 - a FastAPI backend for model inference
 - a React + Vite frontend for image upload and results
-- optional Anthropic Claude enrichment for readable advice
+- optional Claude enrichment via OpenRouter for readable advice
 
 ## Features
 
@@ -29,7 +29,7 @@ This project combines:
 - Frontend: React, Vite
 - Backend: FastAPI, Uvicorn
 - ML: PyTorch, Torchvision, Pillow, NumPy
-- AI enrichment: Anthropic Claude API
+- AI enrichment: OpenRouter API (Claude models)
 
 ## Project Structure
 
@@ -95,7 +95,10 @@ pip install -r backend/requirements.txt
 Copy `.env.example` to `.env` and add your real key:
 
 ```env
-ANTHROPIC_API_KEY=your_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=anthropic/claude-opus-4.6
+OPENROUTER_SITE_URL=http://localhost:8000
+OPENROUTER_APP_NAME=KisanDrishti Scan
 ```
 
 Important:
@@ -160,8 +163,8 @@ Supported file types:
 ## Current Notes
 
 - The trained PyTorch models are working locally.
-- Claude integration is already connected in the backend.
-- Claude responses depend on a valid Anthropic API key and available account credits.
+- Claude integration is connected through OpenRouter in the backend.
+- Claude responses depend on a valid OpenRouter API key and available account credits.
 - If Claude is unavailable, the model-only result can still work.
 
 ## Example Use Case

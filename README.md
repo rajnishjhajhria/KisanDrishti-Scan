@@ -1,6 +1,6 @@
 # Kisan Scan
 
-KisanDrishti Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using Claude through OpenRouter.
+KisanDrishti Scan is a mini machine learning web project for crop image analysis. It uses trained PyTorch models to detect plant diseases and estimate crop quality from uploaded images, then optionally adds farmer-friendly guidance using SambaNova (Gemma 3 12B Instruct).
 
 ## Overview
 
@@ -9,7 +9,7 @@ This project combines:
 - computer vision with deep learning
 - a FastAPI backend for model inference
 - a React + Vite frontend for image upload and results
-- optional Claude enrichment via OpenRouter for readable advice
+- optional AI enrichment via SambaNova for readable advice
 
 ## Features
 
@@ -17,7 +17,7 @@ This project combines:
 - Disease prediction using a trained PyTorch model
 - Quality grading using a trained PyTorch model
 - Top prediction confidence scores
-- Optional Claude AI enrichment for:
+- Optional AI enrichment for:
   - disease explanation
   - simple treatment suggestions
   - prevention tips
@@ -29,7 +29,7 @@ This project combines:
 - Frontend: React, Vite
 - Backend: FastAPI, Uvicorn
 - ML: PyTorch, Torchvision, Pillow, NumPy
-- AI enrichment: OpenRouter API (Claude models)
+- AI enrichment: SambaNova API (Gemma models)
 
 ## Project Structure
 
@@ -95,10 +95,9 @@ pip install -r backend/requirements.txt
 Copy `.env.example` to `.env` and add your real key:
 
 ```env
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=anthropic/claude-opus-4.6
-OPENROUTER_SITE_URL=http://localhost:8000
-OPENROUTER_APP_NAME=KisanDrishti Scan
+SAMBANOVA_API_KEY=your_sambanova_api_key_here
+SAMBANOVA_MODEL=gemma-3-12b-it
+SAMBANOVA_BASE_URL=https://api.sambanova.ai/v1
 ```
 
 Important:
@@ -112,7 +111,7 @@ Important:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-uvicorn backend.main:app --reload
+python backend\main.py
 ```
 
 Backend runs at:
@@ -140,7 +139,7 @@ http://localhost:5173
 
 ### `GET /`
 
-Returns basic service status and whether the disease model, quality model, and Claude key are available.
+Returns basic service status and whether the disease model, quality model, and AI key are available.
 
 ### `GET /health`
 
@@ -152,7 +151,7 @@ Accepts an image upload and returns:
 
 - disease prediction
 - quality prediction
-- Claude enrichment when available
+- AI enrichment when available
 - inference timing
 
 Supported file types:
@@ -164,9 +163,9 @@ Supported file types:
 ## Current Notes
 
 - The trained PyTorch models are working locally.
-- Claude integration is connected through OpenRouter in the backend.
-- Claude responses depend on a valid OpenRouter API key and available account credits.
-- If Claude is unavailable, the model-only result can still work.
+- AI enrichment is connected through SambaNova in the backend.
+- AI responses depend on a valid SambaNova API key and available account credits.
+- If AI enrichment is unavailable, the model-only result can still work.
 
 ## Example Use Case
 

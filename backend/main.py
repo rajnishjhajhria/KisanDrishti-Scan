@@ -16,15 +16,14 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 SAVED_MODELS_DIR = BASE_DIR / "saved_models"
 
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
  
-# ── OpenRouter config for Claude ──────────────────────
-openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-openrouter_model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-opus-4.6")
-openrouter_site_url = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
-openrouter_app_name = os.getenv("OPENROUTER_APP_NAME", "KisanDrishti Scan")
+# ── SambaNova config (OpenAI-compatible API) ─────────
+sambanova_api_key = os.getenv("SAMBANOVA_API_KEY")
+sambanova_model = os.getenv("SAMBANOVA_MODEL", "gemma-3-12b-it")
+sambanova_base_url = os.getenv("SAMBANOVA_BASE_URL", "https://api.sambanova.ai/v1")
  
 # ── Image transforms ──────────────────────────────────
 disease_tf = transforms.Compose([
@@ -139,8 +138,8 @@ def parse_json_response(text: str) -> dict:
  
 # ── Claude AI enrichment ─────────────────────────────
 def enrich_with_claude(disease_result: dict, quality_result: dict | None) -> dict:
-    if not openrouter_api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not configured")
+    if not sambanova_api_key:
+        raise RuntimeError("SAMBANOVA_API_KEY is not configured")
 
     disease_name = disease_result["disease_class"]
     crop = disease_result["crop_type"]
@@ -171,27 +170,24 @@ Respond ONLY with JSON (no markdown):
 }}"""
  
     headers = {
-        "Authorization": f"Bearer {openrouter_api_key}",
+        "Authorization": f"Bearer {sambanova_api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": openrouter_site_url,
-        "X-Title": openrouter_app_name,
     }
     payload = {
-        "model": openrouter_model,
+        "model": sambanova_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "max_tokens": 800,
-        "response_format": {"type": "json_object"},
     }
 
     resp = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
+        f"{sambanova_base_url}/chat/completions",
         headers=headers,
         json=payload,
         timeout=45,
     )
     if resp.status_code >= 400:
-        raise RuntimeError(f"OpenRouter error {resp.status_code}: {resp.text}")
+        raise RuntimeError(f"SambaNova error {resp.status_code}: {resp.text}")
 
     data = resp.json()
     text = data["choices"][0]["message"]["content"].strip()
@@ -204,9 +200,9 @@ async def root():
         "name": "KisanDrishti Scan",
         "disease_model": disease_model is not None,
         "quality_model": quality_model is not None,
-        "claude": bool(openrouter_api_key),
-        "claude_provider": "openrouter",
-        "claude_model": openrouter_model,
+        "claude": bool(sambanova_api_key),
+        "claude_provider": "sambanova",
+        "claude_model": sambanova_model,
     }
  
 @app.get("/health")
@@ -247,10 +243,12 @@ async def analyze(
  
     # Enrich with Claude AI
     claude_data = None
+    claude_error = None
     if use_claude:
         try:
             claude_data = enrich_with_claude(disease_result, quality_result)
         except Exception as e:
+            claude_error = str(e)
             logger.warning(f"Claude enrichment failed: {e}")
  
     total_ms = round((time.time() - t0) * 1000, 2)
@@ -262,6 +260,7 @@ async def analyze(
         "disease": disease_result,
         "quality": quality_result,
         "claude": claude_data,
+        "claude_error": claude_error,
         "models_used": {
             "disease_pytorch": True,
             "quality_pytorch": quality_model is not None,
@@ -271,5 +270,5 @@ async def analyze(
  
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
  
